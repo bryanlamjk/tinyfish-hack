@@ -5,12 +5,15 @@ description = "Starter Tinyfish agent for finding travel experience deals."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "fastapi",
   "google-genai",
   "tinyfish>=0.2.4",
+  "uvicorn",
 ]
 
 [project.scripts]
 travel-deals-agent = "travel_deals_agent.cli:main"
+travel-deals-agent-api = "travel_deals_agent.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]
