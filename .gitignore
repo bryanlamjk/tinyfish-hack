@@ -1,0 +1,22 @@
+.DS_Store
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+venv/
+myenv/
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+build/
+dist/
+
+# Generated outputs
+results/

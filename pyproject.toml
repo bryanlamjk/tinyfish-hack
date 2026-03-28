@@ -1,0 +1,16 @@
+[project]
+name = "travel-deals-agent"
+version = "0.1.0"
+description = "Starter Tinyfish agent for finding travel experience deals."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "tinyfish>=0.2.4",
+]
+
+[project.scripts]
+travel-deals-agent = "travel_deals_agent.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
