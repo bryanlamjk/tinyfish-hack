@@ -26,12 +26,22 @@ def _read_dotenv_value(key: str) -> str:
     return ""
 
 
+def _get_required_key(*keys: str, label: str) -> str:
+    """Return the first configured key from env vars or .env."""
+    for key in keys:
+        value = os.getenv(key, "").strip() or _read_dotenv_value(key)
+        if value:
+            return value
+
+    joined_keys = " or ".join(keys)
+    raise RuntimeError(f"Missing {joined_keys}. Add one to .env or export it before running {label}.")
+
+
 def get_tinyfish_api_key() -> str:
     """Return the Tinyfish API key or raise a helpful error."""
-    api_key = os.getenv("TINYFISH_API_KEY", "").strip() or _read_dotenv_value("TINYFISH_API_KEY")
-    if api_key:
-        return api_key
+    return _get_required_key("TINYFISH_API_KEY", label="the Tinyfish search")
 
-    raise RuntimeError(
-        "Missing TINYFISH_API_KEY. Add it to .env or export it before running the agent."
-    )
+
+def get_gemini_api_key() -> str:
+    """Return the Gemini API key or raise a helpful error."""
+    return _get_required_key("GEMINI_API_KEY", "GOOGLE_API_KEY", label="provider discovery")

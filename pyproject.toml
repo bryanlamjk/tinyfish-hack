@@ -5,6 +5,7 @@ description = "Starter Tinyfish agent for finding travel experience deals."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "google-genai",
   "tinyfish>=0.2.4",
 ]
 

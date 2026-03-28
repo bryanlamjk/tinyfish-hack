@@ -76,3 +76,51 @@ def build_goal(
         }}
         """
     ).strip()
+
+
+def build_provider_discovery_prompt(
+    *,
+    destination: str,
+    category: str,
+    date_hint: str | None,
+    max_providers: int,
+) -> str:
+    """Build a grounded Gemini prompt for ticket provider discovery."""
+    timing = date_hint or "flexible travel dates"
+    return dedent(
+        f"""
+        Use Google Search grounding to find {max_providers} strong ticket or experience
+        providers for travelers going to {destination}.
+
+        Focus on sites that are likely to sell or list bookable options for:
+        {category}
+
+        Travel timing: {timing}.
+
+        Prioritize:
+        - established booking marketplaces
+        - official attraction or experience ticketing sites
+        - sites that are useful starting points for browsing and comparing offers
+
+        Avoid:
+        - blog posts
+        - affiliate roundups
+        - news articles
+        - generic informational pages with no bookable inventory
+
+        Return provider URLs that Tinyfish can open directly, preferably homepages,
+        destination pages, or activity category pages.
+
+        Return only valid JSON with this exact shape and no markdown fences:
+        {{
+          "search_summary": "short summary",
+          "providers": [
+            {{
+              "provider_name": "string",
+              "url": "https://example.com",
+              "why_relevant": "string"
+            }}
+          ]
+        }}
+        """
+    ).strip()

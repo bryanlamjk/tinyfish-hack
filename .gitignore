@@ -6,7 +6,7 @@
 !.env.example
 venv/
 myenv/
-
+.venv/
 # Python caches and build artifacts
 __pycache__/
 *.py[cod]
