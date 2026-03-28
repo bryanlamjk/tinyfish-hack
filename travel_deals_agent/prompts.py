@@ -13,11 +13,11 @@ def build_goal(
     currency: str,
     max_results: int,
 ) -> str:
-    """Build a goal that asks Tinyfish for normalized travel experience deals."""
+    """Build a goal that asks Tinyfish for normalized travel experience results."""
     timing = date_hint or "the user's travel window is flexible"
     return dedent(
         f"""
-        Find the best-value travel experiences in {destination}.
+        Find the best matching bookable travel experiences in {destination}.
 
         Focus on {category}.
         Travel timing: {timing}.
@@ -26,9 +26,26 @@ def build_goal(
 
         Search the current website thoroughly for experiences such as guided tours,
         classes, workshops, attraction bundles, day trips, skip-the-line tickets,
-        and other bookable activities. Prioritize deals, discounts, limited-time
-        offers, bundles, sale badges, coupon messaging, and unusually strong value
-        for money.
+        and other bookable activities. If the category appears to describe a specific
+        attraction or activity, prioritize exact or very close matches first.
+
+        Stay tightly anchored to the requested activity. For example, if the user asks
+        for "Alcatraz tours", do not drift into generic San Francisco passes, dinner
+        cruises, Muir Woods trips, city sightseeing bundles, or unrelated attractions
+        unless the requested activity is explicitly included in the title or product
+        description.
+
+        Prefer options that are currently bookable and relevant, even if the site
+        does not show an explicit discount. If discounts, bundles, sale badges,
+        coupon messaging, or strong value signals are present, include them, but do
+        not return an empty result just because no discount is visible.
+
+        Use the site's own search, destination pages, or activity pages if needed.
+        If there are multiple variants, choose the strongest matches for the exact
+        activity first. Only include nearby alternatives if they clearly contain the
+        requested activity as a major part of the experience. If you cannot find exact
+        or closely matching bookable options, return an empty result instead of
+        unrelated experiences.
 
         For each option, extract:
         - title
@@ -64,15 +81,15 @@ def build_goal(
               "booking_url": "string"
             }}
           ],
-          "summary": "1-2 sentence summary of the strongest deals found on this site"
+          "summary": "1-2 sentence summary of the strongest matching bookable options found on this site"
         }}
 
-        If the site has no relevant results, return:
+        If the site has no relevant results after searching or browsing, return:
         {{
           "destination": "{destination}",
           "searched_category": "{category}",
           "results": [],
-          "summary": "No strong matches found on this site."
+          "summary": "No relevant bookable matches found on this site."
         }}
         """
     ).strip()
@@ -101,12 +118,14 @@ def build_provider_discovery_prompt(
         - established booking marketplaces
         - official attraction or experience ticketing sites
         - sites that are useful starting points for browsing and comparing offers
+        - providers with public browseable inventory pages that are likely to work for an automated browser agent
 
         Avoid:
         - blog posts
         - affiliate roundups
         - news articles
         - generic informational pages with no bookable inventory
+        - providers that are heavily gated by CAPTCHA, login walls, or aggressive bot protection unless there are no better options
 
         Return provider URLs that Tinyfish can open directly, preferably homepages,
         destination pages, or activity category pages.

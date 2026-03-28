@@ -225,6 +225,10 @@ a {
   background: rgba(163, 34, 0, 0.18);
 }
 
+.status-blocked {
+  background: rgba(122, 94, 12, 0.2);
+}
+
 .session-id {
   color: var(--muted);
   font-size: 0.85rem;
@@ -250,7 +254,7 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 18px;
-  align-items: end;
+  align-items: flex-end;
   margin-bottom: 18px;
 }
 
@@ -305,16 +309,22 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: start;
+  align-items: flex-start;
   margin-bottom: 14px;
 }
 
 .agent-header a,
 .provider-card a,
-.result-item a {
+.result-item a,
+.stream-link {
   color: var(--mint);
   text-decoration: none;
   font-weight: 700;
+}
+
+.stream-link {
+  display: inline-block;
+  margin-top: 12px;
 }
 
 .stream-frame,

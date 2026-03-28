@@ -39,6 +39,7 @@ class SearchRequest(BaseModel):
     gemini_model: str = Field(default=DEFAULT_GEMINI_DISCOVERY_MODEL)
     stealth: bool = Field(default=False)
     site: str = Field(default="getyourguide")
+    include_viator: bool = Field(default=False, description="Whether Viator should be included in discovery results.")
 
 
 class SearchSessionCreated(BaseModel):
@@ -80,6 +81,7 @@ async def _run_session(session: SearchSession) -> None:
             gemini_model=session.request.gemini_model,
             stealth=session.request.stealth,
             site=session.request.site,
+            include_viator=session.request.include_viator,
         )
         session.result = await search_travel_deals(params, event_callback=lambda event: _publish(session, event))
     except Exception as exc:
