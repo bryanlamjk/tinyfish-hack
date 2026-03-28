@@ -16,7 +16,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run TinyFish travel deal searches, optionally across multiple providers in parallel."
     )
-    parser.add_argument("--destination", required=True, help="City, region, or country to search.")
     parser.add_argument(
         "--site",
         choices=sorted(DEFAULT_SITES),
@@ -98,7 +97,6 @@ def _print_result_line(index: int, item: dict[str, Any], *, indent: str = "") ->
 
 def print_pretty_summary(payload: dict[str, Any]) -> None:
     print()
-    print(f"Destination: {payload.get('destination')}")
     print(f"Category: {payload.get('searched_category')}")
     print(f"Summary: {payload.get('summary')}")
 
@@ -175,7 +173,6 @@ async def _run_search(args: argparse.Namespace) -> dict[str, Any]:
             print(json.dumps(event))
 
     params = SearchParams(
-        destination=args.destination,
         category=args.category,
         date_hint=args.date_hint,
         currency=args.currency,

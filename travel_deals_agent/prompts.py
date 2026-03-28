@@ -7,89 +7,70 @@ from textwrap import dedent
 
 def build_goal(
     *,
-    destination: str,
     date_hint: str | None,
     category: str,
     currency: str,
     max_results: int,
 ) -> str:
-    """Build a goal that asks Tinyfish for normalized travel experience results."""
+    """Build a goal closer to the original working marketplace extraction flow."""
     timing = date_hint or "the user's travel window is flexible"
     return dedent(
         f"""
-        Find the best matching bookable travel experiences in {destination}.
+        Find the strongest bookable ticket or experience options on this website.
 
-        Focus on {category}.
+        Search request: {category}
         Travel timing: {timing}.
         Preferred display currency: {currency}.
         Return up to {max_results} strongest options.
 
-        Search the current website thoroughly for experiences such as guided tours,
-        classes, workshops, attraction bundles, day trips, skip-the-line tickets,
-        and other bookable activities. If the category appears to describe a specific
-        attraction or activity, prioritize exact or very close matches first.
+        Search the current website thoroughly for bookable tickets, tours, passes,
+        attraction admission, boat tours, day trips, classes, and other relevant
+        activities that closely match the search request. Prioritize exact or very
+        close matches first.
 
-        Stay tightly anchored to the requested activity. For example, if the user asks
-        for "Alcatraz tours", do not drift into generic San Francisco passes, dinner
-        cruises, Muir Woods trips, city sightseeing bundles, or unrelated attractions
-        unless the requested activity is explicitly included in the title or product
-        description.
+        Favor options that are clearly bookable now and have visible pricing.
+        Standard ticket prices are important, but if the site presents multiple
+        clearly relevant bookable options, return the strongest ones instead of
+        returning nothing.
 
-        Prefer options that are currently bookable and relevant, even if the site
-        does not show an explicit discount. If discounts, bundles, sale badges,
-        coupon messaging, or strong value signals are present, include them, but do
-        not return an empty result just because no discount is visible.
+        Rules:
+        1. Use only this website.
+        2. Use the site's search, category pages, or browse pages if needed.
+        3. Close cookie or consent banners if they block the page.
+        4. Wait for the pricing section, listing cards, ticket options, or booking widget to fully load before extracting.
+        5. If the page is still rendering, shows loading placeholders, or lazy-loads pricing, wait and scroll before deciding there are no results.
+        6. If pricing is hidden behind tabs, accordions, or ticket option selectors, click the standard or general admission option first.
+        7. Do not click checkout, payment, or final purchase buttons.
+        8. Ignore login-only results, blog posts, generic guide pages, and unrelated attractions.
+        9. Ignore heavily upsold bundles, memberships, hotel packages, and gift cards unless they are the only clearly relevant priced options.
+        10. If some fields are missing, still return the result with null for missing fields.
+        11. Return JSON only.
 
-        Use the site's own search, destination pages, or activity pages if needed.
-        If there are multiple variants, choose the strongest matches for the exact
-        activity first. Only include nearby alternatives if they clearly contain the
-        requested activity as a major part of the experience. If you cannot find exact
-        or closely matching bookable options, return an empty result instead of
-        unrelated experiences.
-
-        For each option, extract:
-        - title
-        - provider
-        - price
-        - original_price if shown
-        - currency
-        - discount_text
-        - duration
-        - rating
-        - review_count
-        - location
-        - short_reason_it_is_a_good_deal
-        - booking_url
-
-        Return valid JSON with this shape:
+        Return JSON with this exact structure:
         {{
-          "destination": "{destination}",
           "searched_category": "{category}",
           "results": [
             {{
-              "title": "string",
-              "provider": "string or null",
-              "price": "string or null",
-              "original_price": "string or null",
+              "title": "Example Experience Title",
+              "provider": "Example Provider",
+              "price": 67.67,
+              "original_price": null,
               "currency": "{currency}",
-              "discount_text": "string or null",
-              "duration": "string or null",
-              "rating": "string or null",
-              "review_count": "string or null",
-              "location": "string or null",
-              "short_reason_it_is_a_good_deal": "string",
-              "booking_url": "string"
+              "duration": null,
+              "rating": null,
+              "review_count": null,
+              "short_reason_it_is_a_good_deal": "Clearly priced, bookable option that closely matches the request.",
+              "booking_url": "https://example.com/booking"
             }}
           ],
-          "summary": "1-2 sentence summary of the strongest matching bookable options found on this site"
+          "summary": "1-2 sentence summary of the strongest relevant bookable options found on this site."
         }}
 
-        If the site has no relevant results after searching or browsing, return:
+        If the site has no relevant results, return:
         {{
-          "destination": "{destination}",
           "searched_category": "{category}",
           "results": [],
-          "summary": "No relevant bookable matches found on this site."
+          "summary": "No strong matches found on this site."
         }}
         """
     ).strip()
@@ -97,7 +78,6 @@ def build_goal(
 
 def build_provider_discovery_prompt(
     *,
-    destination: str,
     category: str,
     date_hint: str | None,
     max_providers: int,
@@ -107,28 +87,34 @@ def build_provider_discovery_prompt(
     return dedent(
         f"""
         Use Google Search grounding to find {max_providers} strong ticket or experience
-        providers for travelers going to {destination}.
-
-        Focus on sites that are likely to sell or list bookable options for:
+        providers for this travel search request:
         {category}
 
         Travel timing: {timing}.
 
         Prioritize:
-        - established booking marketplaces
-        - official attraction or experience ticketing sites
+        - broad established booking marketplaces with searchable public inventory
+        - top-level provider pages that are useful starting points for browsing and comparing offers
+        - sites that are likely to work for an automated browser agent without login
+        - official attraction or experience ticketing sites only when they are clearly browsable and not heavily gated
         - sites that are useful starting points for browsing and comparing offers
-        - providers with public browseable inventory pages that are likely to work for an automated browser agent
 
         Avoid:
         - blog posts
         - affiliate roundups
         - news articles
         - generic informational pages with no bookable inventory
-        - providers that are heavily gated by CAPTCHA, login walls, or aggressive bot protection unless there are no better options
+        - providers that are heavily gated by CAPTCHA, login walls, or aggressive bot protection
+        - single attraction detail pages when a broader homepage, destination page, or search page exists
+        - provider URLs that land on a single product, single ticket, booking step, or checkout flow
 
-        Return provider URLs that Tinyfish can open directly, preferably homepages,
-        destination pages, or activity category pages.
+        Return provider URLs that Tinyfish can open directly, strongly preferring main pages only:
+        - provider homepage
+        - locale homepage
+        - top-level destination page
+        - top-level search page
+
+        Do not return product-detail, activity-detail, booking, or checkout pages.
 
         Return only valid JSON with this exact shape and no markdown fences:
         {{

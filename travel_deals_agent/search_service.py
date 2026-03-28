@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime
+from time import monotonic
 from typing import Any, Awaitable, Callable
+from urllib.parse import urlparse
 
 from tinyfish import (
     AsyncTinyFish,
@@ -33,14 +37,13 @@ DEFAULT_SITES: dict[str, str] = {
     "viator": "https://www.viator.com",
     "airbnb": "https://www.airbnb.com/experiences",
 }
+BLOCKED_PROVIDER_DOMAINS = {"klook.com", "kkday.com", "viator.com"}
 
 PREFERRED_PROVIDER_ORDER = {
     "getyourguide.com": 0,
-    "klook.com": 1,
-    "airbnb.com": 2,
-    "tiqets.com": 3,
-    "headout.com": 4,
-    "viator.com": 99,
+    "airbnb.com": 1,
+    "tiqets.com": 2,
+    "headout.com": 3,
 }
 
 BOT_BLOCK_PATTERNS = (
@@ -69,11 +72,11 @@ MAX_IDENTICAL_PROGRESS_STREAK = 6
 
 
 EventCallback = Callable[[dict[str, Any]], Awaitable[None] | None]
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
 class SearchParams:
-    destination: str
     category: str = "guided tours, workshops, and memorable local experiences"
     date_hint: str | None = None
     currency: str = "USD"
@@ -83,7 +86,6 @@ class SearchParams:
     gemini_model: str = DEFAULT_GEMINI_DISCOVERY_MODEL
     stealth: bool = False
     site: str = "getyourguide"
-    include_viator: bool = False
 
 
 def _isoformat(value: datetime | None) -> str | None:
@@ -117,7 +119,7 @@ def _classify_provider_failure(message: str) -> tuple[str, str]:
         )
     return (
         "unknown",
-        "The run failed for this provider. Try rerunning, using stealth mode, or narrowing the activity and destination.",
+        "The run failed for this provider. Try rerunning, using stealth mode, or narrowing the search request.",
     )
 
 
@@ -136,10 +138,15 @@ def _rank_provider_target(target: dict[str, str]) -> tuple[int, str]:
     return (50, target["provider_name"].lower())
 
 
-def _filter_and_rank_targets(targets: list[dict[str, str]], *, include_viator: bool) -> list[dict[str, str]]:
-    filtered = [
-        target for target in targets if include_viator or "viator.com" not in target["url"].lower()
-    ]
+def _is_blocked_provider_url(url: str) -> bool:
+    domain = urlparse(url).netloc.lower()
+    if domain.startswith("www."):
+        domain = domain[4:]
+    return any(domain == blocked or domain.endswith(f".{blocked}") for blocked in BLOCKED_PROVIDER_DOMAINS)
+
+
+def _filter_and_rank_targets(targets: list[dict[str, str]]) -> list[dict[str, str]]:
+    filtered = [target for target in targets if not _is_blocked_provider_url(target["url"])]
     if not filtered:
         filtered = targets
     return sorted(filtered, key=_rank_provider_target)
@@ -162,6 +169,13 @@ def _normalize_result_item(item: dict[str, Any], *, provider_name: str, start_ur
     return normalized
 
 
+def _compact_text(value: str, *, limit: int = 220) -> str:
+    compacted = " ".join(value.split())
+    if len(compacted) <= limit:
+        return compacted
+    return f"{compacted[: limit - 3]}..."
+
+
 def _build_site_payload(
     *,
     provider_name: str,
@@ -175,10 +189,13 @@ def _build_site_payload(
         for item in (results or [])
         if isinstance(item, dict)
     ]
+    summary = (raw_payload or {}).get("summary") if raw_payload else None
+    if not summary:
+        summary = "No strong matches found on this site."
     return {
         "provider_name": provider_name,
         "start_url": start_url,
-        "summary": (raw_payload or {}).get("summary") if raw_payload else None,
+        "summary": summary,
         "results": normalized_results,
         "error": error,
     }
@@ -223,7 +240,7 @@ def _build_final_payload(
         summary = f"{summary} {failed_sites} site runs failed."
 
     return {
-        "destination": params.destination,
+        "search_query": params.category,
         "searched_category": params.category,
         "summary": summary,
         "provider_discovery": discovery_payload,
@@ -259,12 +276,35 @@ async def _run_tinyfish_site_stream(
         progress_events = 0
         last_progress_purpose = ""
         identical_progress_streak = 0
+        recent_progress: list[str] = []
+        attempt_started_at = monotonic()
+        logger.info(
+            "Starting TinyFish run site_id=%s provider=%s url=%s attempt=%s",
+            site_id,
+            provider_name,
+            start_url,
+            attempt,
+        )
+        logger.info(
+            "TinyFish goal site_id=%s provider=%s attempt=%s goal=%s",
+            site_id,
+            provider_name,
+            attempt,
+            _compact_text(goal, limit=600),
+        )
 
         try:
             async with client.agent.stream(goal=goal, url=start_url, browser_profile=profile) as stream:
                 async for event in stream:
                     if isinstance(event, StartedEvent):
                         run_id = event.run_id
+                        logger.info(
+                            "TinyFish run started site_id=%s provider=%s run_id=%s attempt=%s",
+                            site_id,
+                            provider_name,
+                            run_id,
+                            attempt,
+                        )
                         await _emit(
                             event_callback,
                             {
@@ -278,6 +318,13 @@ async def _run_tinyfish_site_stream(
                             },
                         )
                     elif isinstance(event, StreamingUrlEvent):
+                        logger.info(
+                            "TinyFish stream available site_id=%s provider=%s streaming_url=%s attempt=%s",
+                            site_id,
+                            provider_name,
+                            event.streaming_url,
+                            attempt,
+                        )
                         await _emit(
                             event_callback,
                             {
@@ -298,6 +345,19 @@ async def _run_tinyfish_site_stream(
                             identical_progress_streak + 1 if event.purpose == last_progress_purpose else 1
                         )
                         last_progress_purpose = event.purpose
+                        recent_progress.append(event.purpose)
+                        if len(recent_progress) > 8:
+                            recent_progress = recent_progress[-8:]
+                        logger.info(
+                            "TinyFish progress site_id=%s provider=%s attempt=%s step=%s repeat=%s elapsed_s=%.1f purpose=%s",
+                            site_id,
+                            provider_name,
+                            attempt,
+                            progress_events,
+                            identical_progress_streak,
+                            monotonic() - attempt_started_at,
+                            _compact_text(event.purpose),
+                        )
                         if progress_events > MAX_PROGRESS_EVENTS:
                             raise RuntimeError("Provider run appears stuck in a loop after too many progress steps.")
                         if identical_progress_streak >= MAX_IDENTICAL_PROGRESS_STREAK:
@@ -316,6 +376,15 @@ async def _run_tinyfish_site_stream(
                             },
                         )
                     elif isinstance(event, HeartbeatEvent):
+                        logger.info(
+                            "TinyFish heartbeat site_id=%s provider=%s attempt=%s elapsed_s=%.1f progress_steps=%s last_purpose=%s",
+                            site_id,
+                            provider_name,
+                            attempt,
+                            monotonic() - attempt_started_at,
+                            progress_events,
+                            _compact_text(last_progress_purpose) if last_progress_purpose else "<none>",
+                        )
                         await _emit(
                             event_callback,
                             {
@@ -333,22 +402,71 @@ async def _run_tinyfish_site_stream(
                             error_message = event.error.message if event.error else "Unknown Tinyfish error"
                             raise RuntimeError(error_message)
                         final_payload = dict(event.result_json or {})
+                        logger.info(
+                            "TinyFish raw payload site_id=%s provider=%s attempt=%s payload=%s",
+                            site_id,
+                            provider_name,
+                            attempt,
+                            json.dumps(final_payload, ensure_ascii=True),
+                        )
 
-            if final_payload is None and run_id:
+            if run_id and not final_payload:
+                logger.warning(
+                    "TinyFish empty or missing stream payload site_id=%s provider=%s attempt=%s elapsed_s=%.1f progress_steps=%s recent_progress=%s",
+                    site_id,
+                    provider_name,
+                    attempt,
+                    monotonic() - attempt_started_at,
+                    progress_events,
+                    json.dumps(recent_progress, ensure_ascii=True),
+                )
+            if run_id and (final_payload is None or not final_payload):
+                logger.info(
+                    "Fetching TinyFish run snapshot site_id=%s provider=%s run_id=%s attempt=%s",
+                    site_id,
+                    provider_name,
+                    run_id,
+                    attempt,
+                )
                 run = await client.runs.get(run_id)
+                logger.info(
+                    "TinyFish run snapshot site_id=%s provider=%s run_id=%s attempt=%s status=%s result=%s",
+                    site_id,
+                    provider_name,
+                    run_id,
+                    attempt,
+                    run.status,
+                    json.dumps(dict(run.result or {}), ensure_ascii=True),
+                )
                 if run.status != RunStatus.COMPLETED:
                     if run.error:
                         raise RuntimeError(run.error.message)
                     raise RuntimeError(f"Unexpected Tinyfish run status: {run.status}")
-                final_payload = dict(run.result or {})
-
+                if run.result:
+                    final_payload = dict(run.result)
             if final_payload is None:
                 raise RuntimeError("Tinyfish completed without a final JSON payload.")
+            if not final_payload:
+                logger.warning(
+                    "TinyFish final payload still empty site_id=%s provider=%s attempt=%s recent_progress=%s",
+                    site_id,
+                    provider_name,
+                    attempt,
+                    json.dumps(recent_progress, ensure_ascii=True),
+                )
 
             site_payload = _build_site_payload(
                 provider_name=provider_name,
                 start_url=start_url,
                 raw_payload=final_payload,
+            )
+            logger.info(
+                "TinyFish run completed site_id=%s provider=%s attempt=%s results=%s payload=%s",
+                site_id,
+                provider_name,
+                attempt,
+                len(site_payload["results"]),
+                json.dumps(site_payload, ensure_ascii=True),
             )
             await _emit(
                 event_callback,
@@ -366,6 +484,13 @@ async def _run_tinyfish_site_stream(
             return site_payload
         except Exception as exc:
             message = str(exc)
+            logger.exception(
+                "TinyFish run failed site_id=%s provider=%s url=%s attempt=%s",
+                site_id,
+                provider_name,
+                start_url,
+                attempt,
+            )
             failure_category, recommendation = _classify_provider_failure(message)
         finally:
             await client.close()
@@ -418,10 +543,14 @@ async def search_travel_deals(
     """Run a travel deal search, optionally discovering providers first."""
     if params.discover_providers and not 3 <= params.provider_limit <= 5:
         raise RuntimeError("--provider-limit must be between 3 and 5 when provider discovery is enabled.")
+    logger.info(
+        "Search session started category=%s discover_providers=%s",
+        params.category,
+        params.discover_providers,
+    )
 
     tinyfish_api_key = get_tinyfish_api_key()
     goal = build_goal(
-        destination=params.destination,
         date_hint=params.date_hint,
         category=params.category,
         currency=params.currency,
@@ -432,7 +561,6 @@ async def search_travel_deals(
         event_callback,
         {
             "type": "session.started",
-            "destination": params.destination,
             "category": params.category,
             "discover_providers": params.discover_providers,
         },
@@ -446,7 +574,6 @@ async def search_travel_deals(
             event_callback,
             {
                 "type": "providers.discovery_started",
-                "destination": params.destination,
                 "category": params.category,
                 "provider_limit": params.provider_limit,
                 "model": params.gemini_model,
@@ -455,7 +582,6 @@ async def search_travel_deals(
         discovery_payload = await asyncio.to_thread(
             discover_provider_urls,
             api_key=get_gemini_api_key(),
-            destination=params.destination,
             category=params.category,
             date_hint=params.date_hint,
             max_providers=params.provider_limit,
@@ -469,7 +595,7 @@ async def search_travel_deals(
             }
             for index, provider in enumerate(discovery_payload["providers"])
         ]
-        targets = _filter_and_rank_targets(targets, include_viator=params.include_viator)
+        targets = _filter_and_rank_targets(targets)
         targets = [{**target, "site_id": f"site-{index + 1}"} for index, target in enumerate(targets)]
         await _emit(
             event_callback,
@@ -522,6 +648,12 @@ async def search_travel_deals(
         params=params,
         discovery_payload=discovery_payload,
         site_results=site_results,
+    )
+    logger.info(
+        "Search session completed category=%s total_results=%s providers=%s",
+        params.category,
+        len(final_payload["results"]),
+        [site["provider_name"] for site in final_payload["site_results"]],
     )
     await _emit(
         event_callback,

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
@@ -13,6 +15,54 @@ from travel_deals_agent.prompts import build_provider_discovery_prompt
 
 
 DEFAULT_GEMINI_DISCOVERY_MODEL = "gemini-2.5-flash"
+logger = logging.getLogger(__name__)
+BLOCKED_PROVIDER_DOMAINS = ("klook.com", "kkday.com", "viator.com")
+PRODUCT_PATH_PATTERNS = (
+    r"/activity/",
+    r"/activities/",
+    r"/ticket/",
+    r"/tickets/",
+    r"/product/",
+    r"/products/",
+    r"/experience/",
+    r"/experiences/",
+    r"/tour/",
+    r"/tours/",
+    r"/booking/",
+)
+HOME_PATH_PATTERNS = (
+    r"^/$",
+    r"^/[a-z]{2}(?:-[a-z]{2})?/?$",
+    r"^/[a-z]{2}(?:-[a-z]{2})?/[a-z]{2}(?:-[a-z]{2})?/?$",
+    r"^/web/[a-z]{2}/?$",
+)
+
+
+def _is_product_like_path(path: str) -> bool:
+    lowered_path = path.lower()
+    if any(marker in lowered_path for marker in PRODUCT_PATH_PATTERNS):
+        return True
+    if re.search(r"-l\d+/?$", lowered_path):
+        return True
+    if re.search(r"/[^/]*\d{3,}[^/]*$", lowered_path):
+        return True
+    return False
+
+
+def _prefer_main_page(url: str) -> str | None:
+    parsed = urlparse(url)
+    if not parsed.netloc:
+        return None
+
+    path = parsed.path or "/"
+    lowered_path = path.lower()
+    if any(re.fullmatch(pattern, lowered_path) for pattern in HOME_PATH_PATTERNS):
+        return urlunparse((parsed.scheme, parsed.netloc, path, "", "", ""))
+
+    if _is_product_like_path(path):
+        return urlunparse((parsed.scheme, parsed.netloc, "/", "", "", ""))
+
+    return urlunparse((parsed.scheme, parsed.netloc, "/", "", "", ""))
 
 
 def _normalize_url(raw_url: str) -> str | None:
@@ -39,10 +89,17 @@ def _normalize_provider_payload(payload: dict[str, Any], max_providers: int) -> 
         url = _normalize_url(str(provider.get("url") or ""))
         if not url:
             continue
+        url = _prefer_main_page(url)
+        if not url:
+            continue
 
         domain = urlparse(url).netloc.lower()
         if domain.startswith("www."):
             domain = domain[4:]
+
+        if any(domain == blocked or domain.endswith(f".{blocked}") for blocked in BLOCKED_PROVIDER_DOMAINS):
+            logger.info("Skipping blocked provider domain=%s url=%s", domain, url)
+            continue
 
         if domain in seen_domains:
             continue
@@ -87,7 +144,6 @@ def _extract_json_payload(raw_text: str) -> dict[str, Any]:
 def discover_provider_urls(
     *,
     api_key: str,
-    destination: str,
     category: str,
     date_hint: str | None,
     max_providers: int,
@@ -96,7 +152,6 @@ def discover_provider_urls(
     """Discover relevant provider URLs with Gemini grounded by Google Search."""
     client = genai.Client(api_key=api_key)
     prompt = build_provider_discovery_prompt(
-        destination=destination,
         category=category,
         date_hint=date_hint,
         max_providers=max_providers,
@@ -132,6 +187,12 @@ def discover_provider_urls(
         raise RuntimeError(f"Gemini provider discovery returned invalid JSON: {exc}") from exc
 
     providers = _normalize_provider_payload(payload, max_providers=max_providers)
+    logger.info(
+        "Gemini provider discovery completed for category=%s model=%s urls=%s",
+        category,
+        model,
+        [provider["url"] for provider in providers],
+    )
     return {
         "model": model,
         "search_summary": str(payload.get("search_summary") or ""),

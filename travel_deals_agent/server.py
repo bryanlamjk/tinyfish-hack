@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -18,6 +19,13 @@ from travel_deals_agent.provider_discovery import DEFAULT_GEMINI_DISCOVERY_MODEL
 from travel_deals_agent.search_service import SearchParams, search_travel_deals
 
 
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+
+logger = logging.getLogger(__name__)
 app = FastAPI(title="Travel Deals Agent API")
 app.add_middleware(
     CORSMiddleware,
@@ -29,8 +37,7 @@ app.add_middleware(
 
 
 class SearchRequest(BaseModel):
-    destination: str = Field(..., description="City, region, or country to search.")
-    category: str = Field(..., description="Experience category to search for.")
+    category: str = Field(..., description="The full search request to search for.")
     date_hint: str | None = Field(default=None, description="Optional timing hint.")
     currency: str = Field(default="USD", description="Preferred display currency.")
     max_results: int = Field(default=3, ge=1, le=10, description="Max results per TinyFish site run.")
@@ -39,7 +46,6 @@ class SearchRequest(BaseModel):
     gemini_model: str = Field(default=DEFAULT_GEMINI_DISCOVERY_MODEL)
     stealth: bool = Field(default=False)
     site: str = Field(default="getyourguide")
-    include_viator: bool = Field(default=False, description="Whether Viator should be included in discovery results.")
 
 
 class SearchSessionCreated(BaseModel):
@@ -70,8 +76,8 @@ async def _publish(session: SearchSession, event: dict[str, Any]) -> None:
 
 async def _run_session(session: SearchSession) -> None:
     try:
+        logger.info("Backend session starting session_id=%s", session.session_id)
         params = SearchParams(
-            destination=session.request.destination,
             category=session.request.category,
             date_hint=session.request.date_hint,
             currency=session.request.currency,
@@ -81,11 +87,12 @@ async def _run_session(session: SearchSession) -> None:
             gemini_model=session.request.gemini_model,
             stealth=session.request.stealth,
             site=session.request.site,
-            include_viator=session.request.include_viator,
         )
         session.result = await search_travel_deals(params, event_callback=lambda event: _publish(session, event))
+        logger.info("Backend session completed session_id=%s", session.session_id)
     except Exception as exc:
         session.error = str(exc)
+        logger.exception("Backend session failed session_id=%s", session.session_id)
         await _publish(session, {"type": "session.failed", "error": session.error})
     finally:
         session.done = True
@@ -103,6 +110,7 @@ async def create_search_session(request: SearchRequest) -> SearchSessionCreated:
     session_id = str(uuid4())
     session = SearchSession(session_id=session_id, request=request)
     SESSIONS[session_id] = session
+    logger.info("Created backend session session_id=%s request=%s", session_id, request.model_dump())
     asyncio.create_task(_run_session(session))
     return SearchSessionCreated(session_id=session_id)
 

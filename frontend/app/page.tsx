@@ -27,7 +27,7 @@ type SiteResult = {
 };
 
 type FinalPayload = {
-  destination: string;
+  search_query?: string;
   searched_category: string;
   summary: string;
   provider_discovery?: {
@@ -76,23 +76,6 @@ type StreamEvent = {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-const KNOWN_DESTINATIONS = [
-  "Tokyo",
-  "Seoul",
-  "Singapore",
-  "Bangkok",
-  "Kyoto",
-  "Osaka",
-  "Hong Kong",
-  "Taipei",
-  "Barcelona",
-  "Rome",
-  "Paris",
-  "London",
-  "New York",
-  "San Francisco",
-];
-
 const CURRENCY_OPTIONS = ["USD", "EUR", "GBP", "SGD", "JPY", "KRW", "HKD"];
 
 const INITIAL_FORM = {
@@ -102,55 +85,7 @@ const INITIAL_FORM = {
   maxResults: 3,
   providerLimit: 4,
   stealth: false,
-  includeViator: false,
 };
-
-function parseSearchText(searchText: string): {
-  destination: string;
-  category: string;
-} {
-  const trimmed = searchText.trim();
-  const lowered = trimmed.toLowerCase();
-
-  for (const destination of [...KNOWN_DESTINATIONS].sort(
-    (a, b) => b.length - a.length,
-  )) {
-    const loweredDestination = destination.toLowerCase();
-
-    if (lowered.startsWith(`${loweredDestination} `)) {
-      const category = trimmed.slice(destination.length).trim();
-      return {
-        destination,
-        category: category || trimmed,
-      };
-    }
-
-    if (lowered.endsWith(` in ${loweredDestination}`)) {
-      const category = trimmed
-        .slice(0, trimmed.length - ` in ${destination}`.length)
-        .trim();
-      return {
-        destination,
-        category: category || trimmed,
-      };
-    }
-
-    if (lowered.endsWith(`, ${loweredDestination}`)) {
-      const category = trimmed
-        .slice(0, trimmed.length - (destination.length + 2))
-        .trim();
-      return {
-        destination,
-        category: category || trimmed,
-      };
-    }
-  }
-
-  return {
-    destination: trimmed,
-    category: trimmed,
-  };
-}
 
 function upsertAgent(
   previous: Record<string, AgentCardState>,
@@ -361,14 +296,13 @@ export default function HomePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ...parseSearchText(form.searchText),
+          category: form.searchText.trim(),
           date_hint: form.dateHint || null,
           currency: form.currency || "USD",
           max_results: form.maxResults,
           discover_providers: true,
           provider_limit: form.providerLimit,
           stealth: form.stealth,
-          include_viator: form.includeViator,
         }),
       });
     } catch {
@@ -422,14 +356,10 @@ export default function HomePage() {
             Gemini finds the provider shortlist, TinyFish fans out across the web,
             and the dashboard streams each agent as it works.
           </p>
-          <p className="muted-copy">
-            Viator is opt-in because it often triggers CAPTCHA or bot-protection
-            challenges for browser agents.
-          </p>
         </div>
         <form className="search-panel" onSubmit={handleSubmit}>
           <label className="field field-large">
-            <span>Search (Include Location)</span>
+            <span>Search</span>
             <input
               value={form.searchText}
               onChange={(event) =>
@@ -438,7 +368,7 @@ export default function HomePage() {
                   searchText: event.target.value,
                 }))
               }
-              placeholder="Alcatraz tour San Francisco, Tokyo museum tickets, Seoul food tours..."
+              placeholder="Universal Studios Japan tickets, Alcatraz tour San Francisco, Tokyo museum tickets..."
               required
               disabled={isRunning}
             />
@@ -521,20 +451,6 @@ export default function HomePage() {
                   setForm((current) => ({
                     ...current,
                     stealth: event.target.checked,
-                  }))
-                }
-                disabled={isRunning}
-              />
-            </label>
-            <label className="field checkbox-field">
-              <span>Include Viator</span>
-              <input
-                type="checkbox"
-                checked={form.includeViator}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    includeViator: event.target.checked,
                   }))
                 }
                 disabled={isRunning}
@@ -678,7 +594,7 @@ export default function HomePage() {
           <div className="results-shell">
             <div className="results-summary">
               <h3>
-                {finalPayload.destination} · {finalPayload.searched_category}
+                {finalPayload.search_query || finalPayload.searched_category}
               </h3>
               <p>{finalPayload.summary}</p>
             </div>
