@@ -16,7 +16,18 @@ from travel_deals_agent.prompts import build_provider_discovery_prompt
 
 DEFAULT_GEMINI_DISCOVERY_MODEL = "gemini-2.5-flash"
 logger = logging.getLogger(__name__)
-BLOCKED_PROVIDER_DOMAINS = ("klook.com", "kkday.com", "viator.com")
+MARKETPLACE_PROVIDER_DOMAINS = (
+    "booking.com",
+    "expedia.com",
+    "getyourguide.com",
+    "headout.com",
+    "kkday.com",
+    "klook.com",
+    "tiqets.com",
+    "trip.com",
+    "viator.com",
+    "pelago.co",
+)
 PRODUCT_PATH_PATTERNS = (
     r"/activity/",
     r"/activities/",
@@ -81,7 +92,16 @@ def _normalize_url(raw_url: str) -> str | None:
     return urlunparse((parsed.scheme, parsed.netloc, normalized_path, "", "", ""))
 
 
-def _normalize_provider_payload(payload: dict[str, Any], max_providers: int) -> list[dict[str, str]]:
+def _is_marketplace_provider_domain(domain: str) -> bool:
+    return any(domain == blocked or domain.endswith(f".{blocked}") for blocked in MARKETPLACE_PROVIDER_DOMAINS)
+
+
+def _normalize_provider_payload(
+    payload: dict[str, Any],
+    max_providers: int,
+    *,
+    block_marketplace_providers: bool,
+) -> list[dict[str, str]]:
     normalized: list[dict[str, str]] = []
     seen_domains: set[str] = set()
 
@@ -97,7 +117,7 @@ def _normalize_provider_payload(payload: dict[str, Any], max_providers: int) -> 
         if domain.startswith("www."):
             domain = domain[4:]
 
-        if any(domain == blocked or domain.endswith(f".{blocked}") for blocked in BLOCKED_PROVIDER_DOMAINS):
+        if block_marketplace_providers and _is_marketplace_provider_domain(domain):
             logger.info("Skipping blocked provider domain=%s url=%s", domain, url)
             continue
 
@@ -140,7 +160,7 @@ def _extract_json_payload(raw_text: str) -> dict[str, Any]:
             raise
         return json.loads(text[start : end + 1])
 
-
+# returns list of URLs to be passed to TinyFish Agents
 def discover_provider_urls(
     *,
     api_key: str,
@@ -148,6 +168,7 @@ def discover_provider_urls(
     date_hint: str | None,
     max_providers: int,
     model: str,
+    block_marketplace_providers: bool,
 ) -> dict[str, Any]:
     """Discover relevant provider URLs with Gemini grounded by Google Search."""
     client = genai.Client(api_key=api_key)
@@ -155,6 +176,7 @@ def discover_provider_urls(
         category=category,
         date_hint=date_hint,
         max_providers=max_providers,
+        block_marketplace_providers=block_marketplace_providers,
     )
 
     try:
@@ -186,7 +208,11 @@ def discover_provider_urls(
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Gemini provider discovery returned invalid JSON: {exc}") from exc
 
-    providers = _normalize_provider_payload(payload, max_providers=max_providers)
+    providers = _normalize_provider_payload(
+        payload,
+        max_providers=max_providers,
+        block_marketplace_providers=block_marketplace_providers,
+    )
     logger.info(
         "Gemini provider discovery completed for category=%s model=%s urls=%s",
         category,

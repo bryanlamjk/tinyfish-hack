@@ -52,12 +52,17 @@ def parse_args() -> argparse.Namespace:
         "--provider-limit",
         type=int,
         default=4,
-        help="How many provider URLs Gemini should return when discovery is enabled (3-5).",
+        help="How many provider URLs Gemini should return when discovery is enabled (1-5).",
     )
     parser.add_argument(
         "--gemini-model",
         default=DEFAULT_GEMINI_DISCOVERY_MODEL,
         help="Gemini model to use for provider discovery.",
+    )
+    parser.add_argument(
+        "--allow-marketplaces",
+        action="store_true",
+        help="Allow Gemini to return marketplaces and aggregators instead of restricting discovery to direct providers.",
     )
     parser.add_argument(
         "--stealth",
@@ -179,6 +184,7 @@ async def _run_search(args: argparse.Namespace) -> dict[str, Any]:
         max_results=args.max_results,
         discover_providers=args.discover_providers,
         provider_limit=args.provider_limit,
+        block_marketplace_providers=not args.allow_marketplaces,
         gemini_model=args.gemini_model,
         stealth=args.stealth,
         site=args.site,

@@ -42,7 +42,11 @@ class SearchRequest(BaseModel):
     currency: str = Field(default="USD", description="Preferred display currency.")
     max_results: int = Field(default=3, ge=1, le=10, description="Max results per TinyFish site run.")
     discover_providers: bool = Field(default=True, description="Use Gemini to discover providers first.")
-    provider_limit: int = Field(default=4, ge=3, le=5, description="How many providers to discover.")
+    provider_limit: int = Field(default=4, ge=1, le=5, description="How many providers to discover.")
+    block_marketplace_providers: bool = Field(
+        default=True,
+        description="When true, Gemini discovery and target filtering avoid travel marketplaces and aggregators.",
+    )
     gemini_model: str = Field(default=DEFAULT_GEMINI_DISCOVERY_MODEL)
     stealth: bool = Field(default=False)
     site: str = Field(default="getyourguide")
@@ -84,6 +88,7 @@ async def _run_session(session: SearchSession) -> None:
             max_results=session.request.max_results,
             discover_providers=session.request.discover_providers,
             provider_limit=session.request.provider_limit,
+            block_marketplace_providers=session.request.block_marketplace_providers,
             gemini_model=session.request.gemini_model,
             stealth=session.request.stealth,
             site=session.request.site,

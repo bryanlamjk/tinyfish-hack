@@ -16,7 +16,7 @@ def build_goal(
     timing = date_hint or "the user's travel window is flexible"
     return dedent(
         f"""
-        Find the strongest bookable ticket or experience options on this website.
+        Find the best matching bookable ticket or experience options on this website.
 
         Search request: {category}
         Travel timing: {timing}.
@@ -24,13 +24,13 @@ def build_goal(
         Return up to {max_results} strongest options.
 
         Search the current website thoroughly for bookable tickets, tours, passes,
-        attraction admission, boat tours, day trips, classes, and other relevant
+        attraction admission, day trips, classes, and other relevant
         activities that closely match the search request. Prioritize exact or very
         close matches first.
 
         Favor options that are clearly bookable now and have visible pricing.
         Standard ticket prices are important, but if the site presents multiple
-        clearly relevant bookable options, return the strongest ones instead of
+        clearly relevant bookable options, return the ones matching the users request instead of
         returning nothing.
 
         Rules:
@@ -53,8 +53,7 @@ def build_goal(
             {{
               "title": "Example Experience Title",
               "provider": "Example Provider",
-              "price": 67.67,
-              "original_price": null,
+              "price": "$67.67",
               "currency": "{currency}",
               "duration": null,
               "rating": null,
@@ -81,23 +80,50 @@ def build_provider_discovery_prompt(
     category: str,
     date_hint: str | None,
     max_providers: int,
+    block_marketplace_providers: bool,
 ) -> str:
     """Build a grounded Gemini prompt for ticket provider discovery."""
     timing = date_hint or "flexible travel dates"
+    marketplace_guidance = (
+        """
+        Direct providers only:
+        - official attraction or experience ticketing sites
+        - direct local operators
+        - official venue, museum, theme park, cruise, tour, or attraction pages
+
+        Avoid marketplaces and aggregators such as:
+        - klook.com
+        - trip.com
+        - getyourguide.com
+        - viator.com
+        - expedia.com
+        - booking.com
+        - kkday.com
+        - headout.com
+        - tiqets.com
+        - pelago.co
+        """
+        if block_marketplace_providers
+        else """
+        Include all relevant provider types:
+        - direct official ticket providers
+        - local operators
+        - travel marketplaces and aggregators when they are useful starting points
+
+        Do not block marketplace domains in this mode.
+        """
+    )
     return dedent(
         f"""
-        Use Google Search grounding to find {max_providers} strong ticket or experience
-        providers for this travel search request:
-        {category}
+        Use Google Search grounding to find {max_providers} ticket providers for this travel search request: {category}
 
         Travel timing: {timing}.
 
         Prioritize:
-        - broad established booking marketplaces with searchable public inventory
-        - top-level provider pages that are useful starting points for browsing and comparing offers
         - sites that are likely to work for an automated browser agent without login
-        - official attraction or experience ticketing sites only when they are clearly browsable and not heavily gated
         - sites that are useful starting points for browsing and comparing offers
+
+        {marketplace_guidance}
 
         Avoid:
         - blog posts

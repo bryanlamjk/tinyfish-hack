@@ -27,6 +27,7 @@ from travel_deals_agent.config import get_gemini_api_key, get_tinyfish_api_key
 from travel_deals_agent.prompts import build_goal
 from travel_deals_agent.provider_discovery import (
     DEFAULT_GEMINI_DISCOVERY_MODEL,
+    MARKETPLACE_PROVIDER_DOMAINS,
     discover_provider_urls,
 )
 
@@ -37,8 +38,6 @@ DEFAULT_SITES: dict[str, str] = {
     "viator": "https://www.viator.com",
     "airbnb": "https://www.airbnb.com/experiences",
 }
-BLOCKED_PROVIDER_DOMAINS = {"klook.com", "kkday.com", "viator.com"}
-
 PREFERRED_PROVIDER_ORDER = {
     "getyourguide.com": 0,
     "airbnb.com": 1,
@@ -83,6 +82,7 @@ class SearchParams:
     max_results: int = 5
     discover_providers: bool = False
     provider_limit: int = 4
+    block_marketplace_providers: bool = True
     gemini_model: str = DEFAULT_GEMINI_DISCOVERY_MODEL
     stealth: bool = False
     site: str = "getyourguide"
@@ -142,10 +142,17 @@ def _is_blocked_provider_url(url: str) -> bool:
     domain = urlparse(url).netloc.lower()
     if domain.startswith("www."):
         domain = domain[4:]
-    return any(domain == blocked or domain.endswith(f".{blocked}") for blocked in BLOCKED_PROVIDER_DOMAINS)
+    return any(domain == blocked or domain.endswith(f".{blocked}") for blocked in MARKETPLACE_PROVIDER_DOMAINS)
 
 
-def _filter_and_rank_targets(targets: list[dict[str, str]]) -> list[dict[str, str]]:
+def _filter_and_rank_targets(
+    targets: list[dict[str, str]],
+    *,
+    block_marketplace_providers: bool,
+) -> list[dict[str, str]]:
+    if not block_marketplace_providers:
+        return sorted(targets, key=_rank_provider_target)
+
     filtered = [target for target in targets if not _is_blocked_provider_url(target["url"])]
     if not filtered:
         filtered = targets
@@ -176,6 +183,49 @@ def _compact_text(value: str, *, limit: int = 220) -> str:
     return f"{compacted[: limit - 3]}..."
 
 
+def _extract_json_object(raw_text: str) -> dict[str, Any]:
+    text = raw_text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 3 and lines[0].startswith("```") and lines[-1].strip() == "```":
+            text = "\n".join(lines[1:-1]).strip()
+            if text.lower().startswith("json"):
+                text = text[4:].lstrip()
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return {}
+        try:
+            parsed = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return {}
+
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _coerce_site_payload(raw_payload: Any) -> dict[str, Any]:
+    if isinstance(raw_payload, dict):
+        if isinstance(raw_payload.get("results"), list):
+            return dict(raw_payload)
+
+        nested_result = raw_payload.get("result")
+        if isinstance(nested_result, str):
+            parsed_nested = _extract_json_object(nested_result)
+            if parsed_nested:
+                return parsed_nested
+
+        return dict(raw_payload)
+
+    if isinstance(raw_payload, str):
+        return _extract_json_object(raw_payload)
+
+    return {}
+
+
 def _build_site_payload(
     *,
     provider_name: str,
@@ -183,13 +233,14 @@ def _build_site_payload(
     raw_payload: dict[str, Any] | None = None,
     error: str | None = None,
 ) -> dict[str, Any]:
-    results = raw_payload.get("results") if raw_payload else []
+    normalized_payload = _coerce_site_payload(raw_payload)
+    results = normalized_payload.get("results") if normalized_payload else []
     normalized_results = [
         _normalize_result_item(item, provider_name=provider_name, start_url=start_url)
         for item in (results or [])
         if isinstance(item, dict)
     ]
-    summary = (raw_payload or {}).get("summary") if raw_payload else None
+    summary = normalized_payload.get("summary") if normalized_payload else None
     if not summary:
         summary = "No strong matches found on this site."
     return {
@@ -541,8 +592,8 @@ async def search_travel_deals(
     event_callback: EventCallback | None = None,
 ) -> dict[str, Any]:
     """Run a travel deal search, optionally discovering providers first."""
-    if params.discover_providers and not 3 <= params.provider_limit <= 5:
-        raise RuntimeError("--provider-limit must be between 3 and 5 when provider discovery is enabled.")
+    if params.discover_providers and not 1 <= params.provider_limit <= 5:
+        raise RuntimeError("--provider-limit must be between 1 and 5 when provider discovery is enabled.")
     logger.info(
         "Search session started category=%s discover_providers=%s",
         params.category,
@@ -563,6 +614,7 @@ async def search_travel_deals(
             "type": "session.started",
             "category": params.category,
             "discover_providers": params.discover_providers,
+            "block_marketplace_providers": params.block_marketplace_providers,
         },
     )
 
@@ -577,6 +629,7 @@ async def search_travel_deals(
                 "category": params.category,
                 "provider_limit": params.provider_limit,
                 "model": params.gemini_model,
+                "block_marketplace_providers": params.block_marketplace_providers,
             },
         )
         discovery_payload = await asyncio.to_thread(
@@ -586,6 +639,7 @@ async def search_travel_deals(
             date_hint=params.date_hint,
             max_providers=params.provider_limit,
             model=params.gemini_model,
+            block_marketplace_providers=params.block_marketplace_providers,
         )
         targets = [
             {
@@ -595,7 +649,10 @@ async def search_travel_deals(
             }
             for index, provider in enumerate(discovery_payload["providers"])
         ]
-        targets = _filter_and_rank_targets(targets)
+        targets = _filter_and_rank_targets(
+            targets,
+            block_marketplace_providers=params.block_marketplace_providers,
+        )
         targets = [{**target, "site_id": f"site-{index + 1}"} for index, target in enumerate(targets)]
         await _emit(
             event_callback,

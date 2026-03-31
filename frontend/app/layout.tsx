@@ -2,18 +2,19 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Travel Deals Agent",
-  description: "Concurrent TinyFish search dashboard with live agent streams.",
+	title: "TravellingFish",
+	description:
+		"Concurrent TinyFish search dashboard with live agent streams.",
 };
 
 export default function RootLayout({
-  children,
+	children,
 }: Readonly<{
-  children: React.ReactNode;
+	children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
-    </html>
-  );
+	return (
+		<html lang="en" suppressHydrationWarning>
+			<body suppressHydrationWarning>{children}</body>
+		</html>
+	);
 }
