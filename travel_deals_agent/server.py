@@ -94,6 +94,7 @@ async def _run_session(session: SearchSession) -> None:
             stealth=session.request.stealth,
             site=session.request.site,
         )
+        # wait for orchestrator to complete and publish final result
         session.result = await orchestrate_search(params, event_callback=lambda event: _publish(session, event))
         logger.info("Backend session completed session_id=%s", session.session_id)
     except Exception as exc:

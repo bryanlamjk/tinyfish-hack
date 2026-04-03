@@ -15,6 +15,7 @@ from travel_deals_agent.provider_discovery import discover_provider_urls
 from travel_deals_agent.search_service import SearchParams
 
 
+# Emit a tool event if the caller provided a callback.
 async def _emit(callback: EventCallback | None, payload: dict[str, Any]) -> None:
     if callback is None:
         return
@@ -24,6 +25,7 @@ async def _emit(callback: EventCallback | None, payload: dict[str, Any]) -> None
         await maybe_awaitable
 
 
+# Remove callback objects and dataclasses before tracing tool inputs.
 def _process_tool_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     sanitized = dict(inputs)
     sanitized.pop("event_callback", None)
@@ -33,6 +35,7 @@ def _process_tool_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return sanitized
 
 
+# Discover provider targets with grounded web search before scraping.
 @traceable(name="web_search_tool", run_type="tool", process_inputs=_process_tool_inputs)
 async def run_web_search(
     params: SearchParams,

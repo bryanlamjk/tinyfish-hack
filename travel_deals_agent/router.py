@@ -39,6 +39,7 @@ KNOWN_PROVIDER_URLS = {
 }
 
 
+# Parse a JSON object from router model output, including fenced JSON.
 def _extract_json_payload(raw_text: str) -> dict[str, str]:
     text = raw_text.strip()
     if text.startswith("```"):
@@ -60,6 +61,7 @@ def _extract_json_payload(raw_text: str) -> dict[str, str]:
     return payload if isinstance(payload, dict) else {}
 
 
+# Normalize a provider URL into a consistent absolute URL.
 def _normalize_provider_url(raw_url: str | None) -> str | None:
     if not raw_url:
         return None
@@ -78,6 +80,7 @@ def _normalize_provider_url(raw_url: str | None) -> str | None:
     return f"{parsed.scheme}://{parsed.netloc}{path}"
 
 
+# Derive a readable provider name from a provider URL.
 def _provider_name_from_url(provider_url: str) -> str:
     domain = urlparse(provider_url).netloc.lower()
     if domain.startswith("www."):
@@ -85,6 +88,7 @@ def _provider_name_from_url(provider_url: str) -> str:
     return domain
 
 
+# Look for an explicit provider URL or domain mentioned in the query.
 def _extract_explicit_provider_url(query: str) -> str | None:
     url_match = re.search(r"https?://[^\s)]+", query, flags=re.IGNORECASE)
     if url_match:
@@ -102,6 +106,7 @@ def _extract_explicit_provider_url(query: str) -> str | None:
     return None
 
 
+# Decide the route using simple local rules when the model is unavailable.
 def _heuristic_route(params: SearchParams) -> RouteDecision:
     if not params.discover_providers:
         provider_url = DEFAULT_SITES.get(params.site)
@@ -132,6 +137,7 @@ def _heuristic_route(params: SearchParams) -> RouteDecision:
     )
 
 
+# Strip non-serializable inputs before sending router traces to LangSmith.
 def _process_route_inputs(inputs: dict[str, object]) -> dict[str, object]:
     params = inputs.get("params")
     if params is not None and is_dataclass(params):
@@ -139,6 +145,7 @@ def _process_route_inputs(inputs: dict[str, object]) -> dict[str, object]:
     return inputs
 
 
+# Classify a request into direct scraping or web-search-then-scrape.
 @traceable(name="route_query", run_type="chain", process_inputs=_process_route_inputs)
 def route_query(params: SearchParams) -> RouteDecision:
     """Classify the query into a tool path for the orchestrator."""

@@ -16,6 +16,7 @@ from travel_deals_agent.tools.ticket_scraper_tool import run_ticket_scraper
 from travel_deals_agent.tools.web_search_tool import run_web_search
 
 
+# Emit an event to the caller if an event callback is present.
 async def _emit(callback: EventCallback | None, payload: dict[str, Any]) -> None:
     if callback is None:
         return
@@ -25,6 +26,7 @@ async def _emit(callback: EventCallback | None, payload: dict[str, Any]) -> None
         await maybe_awaitable
 
 
+# Route the request and seed state with any explicit provider target.
 async def _route_request(state: OrchestratorState) -> dict[str, Any]:
     params = state["params"]
     event_callback = state.get("event_callback")
@@ -86,10 +88,12 @@ async def _route_request(state: OrchestratorState) -> dict[str, Any]:
     }
 
 
+# Choose the next graph node based on the router decision.
 def _next_after_route(state: OrchestratorState) -> str:
     return "web_search" if state["route"] == "search_then_scrape" else "ticket_scraper"
 
 
+# Run the web-search tool and update the state with the discovered provider targets.
 async def _run_web_search_node(state: OrchestratorState) -> dict[str, Any]:
     params = state["params"]
     result = await run_web_search(
@@ -103,6 +107,7 @@ async def _run_web_search_node(state: OrchestratorState) -> dict[str, Any]:
     }
 
 
+# Run the ticket scraper tool and update the state with the returned payload.
 async def _run_ticket_scraper_node(state: OrchestratorState) -> dict[str, Any]:
     params = state["params"]
     payload = await run_ticket_scraper(
@@ -124,6 +129,7 @@ async def _run_ticket_scraper_node(state: OrchestratorState) -> dict[str, Any]:
     return {"final_payload": enriched_payload}
 
 
+# Emit a final orchestration event after the graph finishes.
 async def _finalize(state: OrchestratorState) -> dict[str, Any]:
     await _emit(
         state.get("event_callback"),
@@ -136,6 +142,7 @@ async def _finalize(state: OrchestratorState) -> dict[str, Any]:
     return {}
 
 
+# Build and compile the LangGraph workflow for request orchestration.
 def _build_graph() -> Any:
     workflow = StateGraph(OrchestratorState)
     workflow.add_node("route_request", _route_request)
@@ -160,6 +167,7 @@ def _build_graph() -> Any:
 GRAPH = _build_graph()
 
 
+# Run the LangGraph orchestrator and return the final payload to the caller.
 async def orchestrate_search(
     params: Any,
     *,

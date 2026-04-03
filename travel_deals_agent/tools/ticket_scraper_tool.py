@@ -12,6 +12,7 @@ from travel_deals_agent.orchestrator_schemas import EventCallback, ProviderTarge
 from travel_deals_agent.search_service import SearchParams, search_travel_deals
 
 
+# Emit a tool event if the caller provided a callback.
 async def _emit(callback: EventCallback | None, payload: dict[str, Any]) -> None:
     if callback is None:
         return
@@ -21,6 +22,7 @@ async def _emit(callback: EventCallback | None, payload: dict[str, Any]) -> None
         await maybe_awaitable
 
 
+# Remove callback objects and dataclasses before tracing tool inputs.
 def _process_tool_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     sanitized = dict(inputs)
     sanitized.pop("event_callback", None)
@@ -30,6 +32,7 @@ def _process_tool_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return sanitized
 
 
+# Build a provider-discovery payload for explicit targets selected by the router.
 def _build_synthetic_provider_discovery(targets: list[ProviderTarget]) -> dict[str, Any]:
     return {
         "model": "orchestrator-router",
@@ -45,6 +48,7 @@ def _build_synthetic_provider_discovery(targets: list[ProviderTarget]) -> dict[s
     }
 
 
+# Run the TinyFish scraper against explicit targets or the default discovery flow.
 @traceable(name="ticket_scraper_tool", run_type="tool", process_inputs=_process_tool_inputs)
 async def run_ticket_scraper(
     params: SearchParams,

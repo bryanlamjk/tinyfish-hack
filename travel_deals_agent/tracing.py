@@ -9,6 +9,7 @@ from langsmith import Client
 from travel_deals_agent.config import LangSmithSettings, configure_langsmith_environment
 
 
+# Create and cache a LangSmith client when tracing is configured.
 @lru_cache(maxsize=1)
 def get_langsmith_client() -> Client | None:
     """Return a LangSmith client when tracing is configured."""
@@ -26,6 +27,7 @@ def get_langsmith_client() -> Client | None:
     return Client(**client_kwargs)
 
 
+# Build tracing-context arguments for the current request.
 def get_tracing_context_kwargs(
     *,
     tags: list[str] | None = None,
