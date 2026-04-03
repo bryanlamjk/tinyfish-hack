@@ -15,8 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from travel_deals_agent.orchestrator import orchestrate_search
 from travel_deals_agent.provider_discovery import DEFAULT_GEMINI_DISCOVERY_MODEL
-from travel_deals_agent.search_service import SearchParams, search_travel_deals
+from travel_deals_agent.search_service import SearchParams
 
 
 if not logging.getLogger().handlers:
@@ -93,7 +94,7 @@ async def _run_session(session: SearchSession) -> None:
             stealth=session.request.stealth,
             site=session.request.site,
         )
-        session.result = await search_travel_deals(params, event_callback=lambda event: _publish(session, event))
+        session.result = await orchestrate_search(params, event_callback=lambda event: _publish(session, event))
         logger.info("Backend session completed session_id=%s", session.session_id)
     except Exception as exc:
         session.error = str(exc)

@@ -8,8 +8,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from travel_deals_agent.orchestrator import orchestrate_search
 from travel_deals_agent.provider_discovery import DEFAULT_GEMINI_DISCOVERY_MODEL
-from travel_deals_agent.search_service import DEFAULT_SITES, SearchParams, search_travel_deals
+from travel_deals_agent.search_service import DEFAULT_SITES, SearchParams
 
 
 def parse_args() -> argparse.Namespace:
@@ -158,6 +159,14 @@ async def _run_search(args: argparse.Namespace) -> dict[str, Any]:
 
         if event_type == "providers.discovery_started":
             print("Discovering relevant providers with Gemini grounded by Google Search")
+        elif event_type == "orchestrator.started":
+            print("Orchestrator started.")
+        elif event_type == "router.completed":
+            print(f"Route selected: {event.get('route')}")
+        elif event_type == "web_search.started":
+            print("Web search is discovering providers before scraping.")
+        elif event_type == "ticket_scraper.started":
+            print("Ticket scraper is running.")
         elif event_type == "providers.discovered":
             providers = event.get("providers") or []
             print(f"Gemini discovered {len(providers)} providers.")
@@ -189,7 +198,7 @@ async def _run_search(args: argparse.Namespace) -> dict[str, Any]:
         stealth=args.stealth,
         site=args.site,
     )
-    return await search_travel_deals(params, event_callback=on_event)
+    return await orchestrate_search(params, event_callback=on_event)
 
 
 def main() -> None:

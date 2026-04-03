@@ -1,4 +1,6 @@
 fastapi
 google-genai
+langgraph
+langsmith
 tinyfish>=0.2.4
 uvicorn

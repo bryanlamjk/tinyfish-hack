@@ -75,6 +75,48 @@ def build_goal(
     ).strip()
 
 
+def build_router_prompt(
+    *,
+    category: str,
+    date_hint: str | None,
+    site: str | None,
+    discover_providers: bool,
+) -> str:
+    """Build a routing prompt for the top-level orchestrator."""
+    timing = date_hint or "no date specified"
+    manual_site = site or "none"
+    return dedent(
+        f"""
+        You are the routing layer for a travel booking assistant.
+
+        Decide whether the user query should:
+        - go directly to the ticket scraper because a provider or website is already specified
+        - go to web search first to discover relevant providers before scraping
+
+        User query: {category}
+        Date hint: {timing}
+        Manual site preference: {manual_site}
+        Provider discovery requested by caller: {str(discover_providers).lower()}
+
+        Routing rules:
+        1. Choose "direct_ticket_scrape" when the query explicitly names a website, domain, URL, or provider to search on.
+        2. Choose "direct_ticket_scrape" when the caller already supplied a manual site preference.
+        3. Choose "search_then_scrape" when the query asks for tickets or bookable options but does not clearly specify where to look.
+        4. Prefer direct routing only when the provider instruction is explicit, not implied.
+        5. Return JSON only with no markdown fences.
+
+        Return JSON with this exact structure:
+        {{
+          "route": "direct_ticket_scrape" | "search_then_scrape",
+          "reasoning_summary": "short explanation",
+          "rewritten_query": "clean search request to pass to downstream tools",
+          "provider_name": "explicit provider name if present, otherwise null",
+          "provider_url": "explicit provider URL if present, otherwise null"
+        }}
+        """
+    ).strip()
+
+
 def build_provider_discovery_prompt(
     *,
     category: str,

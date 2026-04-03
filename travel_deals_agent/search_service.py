@@ -86,6 +86,8 @@ class SearchParams:
     gemini_model: str = DEFAULT_GEMINI_DISCOVERY_MODEL
     stealth: bool = False
     site: str = "getyourguide"
+    explicit_targets: list[dict[str, str]] | None = None
+    prefetched_provider_discovery: dict[str, Any] | None = None
 
 
 def _isoformat(value: datetime | None) -> str | None:
@@ -618,10 +620,19 @@ async def search_travel_deals(
         },
     )
 
-    discovery_payload: dict[str, Any] | None = None
+    discovery_payload: dict[str, Any] | None = params.prefetched_provider_discovery
     targets: list[dict[str, str]] = []
 
-    if params.discover_providers:
+    if params.explicit_targets:
+        targets = [
+            {
+                "site_id": target.get("site_id") or f"site-{index + 1}",
+                "provider_name": target["provider_name"],
+                "url": target["url"],
+            }
+            for index, target in enumerate(params.explicit_targets)
+        ]
+    elif params.discover_providers:
         await _emit(
             event_callback,
             {
