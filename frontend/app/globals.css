@@ -41,11 +41,64 @@ a {
 	color: inherit;
 }
 
+/* ─── Layout ─────────────────────────────────────────────────────── */
+
 .shell {
 	width: min(1400px, calc(100% - 32px));
 	margin: 0 auto;
 	padding: 32px 0 56px;
 }
+
+/* ─── Tab Navigation ─────────────────────────────────────────────── */
+
+.tab-nav {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 28px;
+	padding-bottom: 18px;
+	border-bottom: 1px solid var(--line);
+}
+
+.brand {
+	font-size: 1.4rem;
+	font-weight: 700;
+	color: var(--accent-dark);
+	letter-spacing: -0.02em;
+}
+
+.tab-buttons {
+	display: flex;
+	gap: 6px;
+	background: rgba(35, 25, 15, 0.06);
+	border-radius: 999px;
+	padding: 4px;
+}
+
+.tab-button {
+	border: 0;
+	border-radius: 999px;
+	padding: 10px 20px;
+	background: transparent;
+	color: var(--muted);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.88rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background 0.2s, color 0.2s;
+}
+
+.tab-button:hover {
+	color: var(--ink);
+}
+
+.tab-button.active {
+	background: var(--paper);
+	color: var(--ink);
+	box-shadow: 0 2px 8px rgba(94, 57, 28, 0.1);
+}
+
+/* ─── Hero ───────────────────────────────────────────────────────── */
 
 .hero {
 	display: grid;
@@ -58,7 +111,10 @@ a {
 .search-panel,
 .providers-panel,
 .streams-panel,
-.results-panel {
+.results-panel,
+.intent-section,
+.tasks-section,
+.itinerary-result-section {
 	border: 1px solid var(--line);
 	border-radius: 28px;
 	background: var(--paper);
@@ -91,7 +147,7 @@ a {
 	color: var(--accent-dark);
 }
 
-.hero h1 {
+.hero-title {
 	margin: 0;
 	font-size: clamp(2.5rem, 5vw, 5rem);
 	line-height: 0.95;
@@ -106,10 +162,15 @@ a {
 	line-height: 1.7;
 }
 
+/* ─── Forms ──────────────────────────────────────────────────────── */
+
 .search-panel,
 .providers-panel,
 .streams-panel,
-.results-panel {
+.results-panel,
+.intent-section,
+.tasks-section,
+.itinerary-result-section {
 	padding: 24px;
 }
 
@@ -130,13 +191,6 @@ a {
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 	color: var(--muted);
-}
-
-.field-help {
-	color: var(--muted);
-	font-size: 0.8rem;
-	line-height: 1.5;
-	font-family: Arial, Helvetica, sans-serif;
 }
 
 .field input,
@@ -209,6 +263,8 @@ a {
 	cursor: wait;
 }
 
+/* ─── Status ─────────────────────────────────────────────────────── */
+
 .status-row {
 	display: flex;
 	flex-wrap: wrap;
@@ -257,9 +313,14 @@ a {
 	font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ─── Sections ───────────────────────────────────────────────────── */
+
 .providers-panel,
 .streams-panel,
-.results-panel {
+.results-panel,
+.intent-section,
+.tasks-section,
+.itinerary-result-section {
 	margin-top: 24px;
 }
 
@@ -284,6 +345,8 @@ a {
 	font-family: Arial, Helvetica, sans-serif;
 	line-height: 1.6;
 }
+
+/* ─── Provider / Agent Cards ─────────────────────────────────────── */
 
 .provider-grid,
 .stream-grid,
@@ -393,6 +456,8 @@ a {
 	padding-right: 8px;
 }
 
+/* ─── Results ────────────────────────────────────────────────────── */
+
 .results-shell {
 	display: grid;
 	gap: 18px;
@@ -424,9 +489,454 @@ a {
 	padding-top: 12px;
 }
 
+/* ─── Pipeline Tracker ───────────────────────────────────────────── */
+
+.pipeline-tracker-section {
+	margin-top: 24px;
+	text-align: center;
+}
+
+.pipeline-tracker {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.pipeline-stage {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 18px;
+	border-radius: 999px;
+	background: rgba(35, 25, 15, 0.06);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.88rem;
+	color: var(--muted);
+	transition: background 0.3s, color 0.3s;
+}
+
+.pipeline-stage.active {
+	background: rgba(31, 122, 97, 0.16);
+	color: var(--mint);
+	font-weight: 700;
+	animation: pulse-stage 2s ease-in-out infinite;
+}
+
+.pipeline-stage.completed {
+	background: rgba(31, 122, 97, 0.1);
+	color: var(--mint);
+}
+
+@keyframes pulse-stage {
+	0%,
+	100% {
+		box-shadow: 0 0 0 0 rgba(31, 122, 97, 0.3);
+	}
+	50% {
+		box-shadow: 0 0 0 6px rgba(31, 122, 97, 0);
+	}
+}
+
+.stage-indicator {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border-radius: 999px;
+	background: rgba(35, 25, 15, 0.08);
+	font-size: 0.78rem;
+	font-weight: 700;
+}
+
+.pipeline-stage.active .stage-indicator {
+	background: var(--mint);
+	color: white;
+}
+
+.pipeline-stage.completed .stage-indicator {
+	background: var(--mint);
+	color: white;
+}
+
+.stage-indicator svg {
+	width: 14px;
+	height: 14px;
+}
+
+.stage-label {
+	white-space: nowrap;
+}
+
+.pipeline-status-message {
+	margin: 16px 0 0;
+	color: var(--muted);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.95rem;
+	font-style: italic;
+}
+
+/* ─── Intent Card ────────────────────────────────────────────────── */
+
+.intent-card {
+	border: 1px solid var(--line);
+	border-radius: 22px;
+	background: rgba(255, 255, 255, 0.74);
+	padding: 22px;
+}
+
+.intent-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 18px;
+}
+
+.intent-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.intent-label {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.75rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	color: var(--muted);
+}
+
+.intent-value {
+	font-size: 1.1rem;
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.intent-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.interest-tag {
+	display: inline-block;
+	padding: 6px 14px;
+	border-radius: 999px;
+	background: rgba(31, 122, 97, 0.12);
+	color: var(--mint);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.82rem;
+	font-weight: 600;
+	text-transform: capitalize;
+}
+
+.constraint-tag {
+	display: inline-block;
+	padding: 6px 14px;
+	border-radius: 999px;
+	background: rgba(201, 91, 43, 0.12);
+	color: var(--accent-dark);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.82rem;
+	font-weight: 600;
+}
+
+/* ─── Task List ──────────────────────────────────────────────────── */
+
+.task-list {
+	display: grid;
+	gap: 10px;
+}
+
+.task-item {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 14px 18px;
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	background: rgba(255, 255, 255, 0.74);
+	font-family: Arial, Helvetica, sans-serif;
+}
+
+.task-day {
+	flex-shrink: 0;
+	padding: 4px 12px;
+	border-radius: 999px;
+	background: rgba(201, 91, 43, 0.12);
+	color: var(--accent-dark);
+	font-size: 0.78rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.task-query {
+	color: var(--ink);
+	font-size: 0.92rem;
+	line-height: 1.4;
+}
+
+/* ─── Search Stats Banner ────────────────────────────────────────── */
+
+.search-stats-banner {
+	margin-top: 18px;
+	padding: 14px 22px;
+	border-radius: 999px;
+	background: rgba(31, 122, 97, 0.1);
+	color: var(--mint);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.9rem;
+	font-weight: 600;
+	text-align: center;
+}
+
+/* ─── Itinerary Result ───────────────────────────────────────────── */
+
+.itinerary-summary-card {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 24px;
+	padding: 24px;
+	border-radius: 22px;
+	background: linear-gradient(
+		135deg,
+		rgba(201, 91, 43, 0.1),
+		rgba(31, 122, 97, 0.1)
+	);
+	margin-bottom: 24px;
+}
+
+.itinerary-summary-text {
+	margin: 0;
+	color: var(--ink);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 1rem;
+	line-height: 1.7;
+	max-width: 60ch;
+}
+
+.itinerary-total-cost {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	flex-shrink: 0;
+	gap: 4px;
+}
+
+.cost-label {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.75rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	color: var(--muted);
+}
+
+.cost-value {
+	font-size: 1.6rem;
+	font-weight: 700;
+	color: var(--mint);
+}
+
+/* ─── Day Cards ──────────────────────────────────────────────────── */
+
+.itinerary-days {
+	display: grid;
+	gap: 20px;
+}
+
+.day-card {
+	border: 1px solid var(--line);
+	border-radius: 22px;
+	background: rgba(255, 255, 255, 0.74);
+	padding: 24px;
+	transition: box-shadow 0.2s;
+}
+
+.day-card:hover {
+	box-shadow: 0 8px 32px rgba(94, 57, 28, 0.1);
+}
+
+.day-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 20px;
+	padding-bottom: 14px;
+	border-bottom: 1px solid var(--line);
+}
+
+.day-title-group {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+}
+
+.day-number {
+	margin: 0;
+	font-size: 1.4rem;
+}
+
+.day-date {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.9rem;
+	color: var(--muted);
+}
+
+.day-cost {
+	padding: 6px 16px;
+	border-radius: 999px;
+	background: rgba(31, 122, 97, 0.1);
+	color: var(--mint);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.88rem;
+	font-weight: 700;
+}
+
+/* ─── Activity Items ─────────────────────────────────────────────── */
+
+.day-activities {
+	display: grid;
+	gap: 16px;
+}
+
+.activity-item {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 16px;
+	padding: 16px;
+	border-radius: 16px;
+	background: rgba(35, 25, 15, 0.02);
+	border: 1px solid rgba(35, 25, 15, 0.06);
+}
+
+.activity-time-col {
+	padding-top: 2px;
+}
+
+.time-badge {
+	display: inline-block;
+	padding: 5px 12px;
+	border-radius: 999px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.75rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	white-space: nowrap;
+	color: white;
+}
+
+.time-morning {
+	background: linear-gradient(135deg, #d4a843, #c9963a);
+}
+
+.time-afternoon {
+	background: linear-gradient(135deg, #c95b2b, #d47a3f);
+}
+
+.time-evening {
+	background: linear-gradient(135deg, #2c6b8c, #3a8fb5);
+}
+
+.activity-content {
+	min-width: 0;
+}
+
+.activity-title {
+	margin: 0 0 6px;
+	font-size: 1.1rem;
+	line-height: 1.3;
+}
+
+.activity-meta-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	margin-bottom: 8px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.88rem;
+}
+
+.activity-provider {
+	color: var(--muted);
+}
+
+.activity-price {
+	font-weight: 700;
+	color: var(--mint);
+}
+
+.activity-reason {
+	margin: 0 0 6px;
+	color: var(--muted);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.88rem;
+	line-height: 1.5;
+}
+
+.activity-notes {
+	margin: 0 0 8px;
+	padding: 8px 12px;
+	border-radius: 10px;
+	background: rgba(31, 122, 97, 0.06);
+	color: var(--ink);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.85rem;
+	line-height: 1.5;
+	font-style: italic;
+}
+
+.booking-link {
+	display: inline-block;
+	padding: 8px 18px;
+	border-radius: 999px;
+	background: linear-gradient(135deg, var(--mint), #2a9e7e);
+	color: white;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.85rem;
+	font-weight: 700;
+	text-decoration: none;
+	transition: opacity 0.2s;
+}
+
+.booking-link:hover {
+	opacity: 0.85;
+}
+
+/* ─── Day Notes ──────────────────────────────────────────────────── */
+
+.day-notes {
+	margin: 16px 0 0;
+	padding: 12px 16px;
+	border-radius: 14px;
+	background: rgba(201, 91, 43, 0.06);
+	color: var(--muted);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.88rem;
+	line-height: 1.6;
+	font-style: italic;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────── */
+
 @media (max-width: 980px) {
 	.hero {
 		grid-template-columns: 1fr;
+	}
+
+	.itinerary-summary-card {
+		flex-direction: column;
+	}
+
+	.itinerary-total-cost {
+		align-items: flex-start;
 	}
 }
 
@@ -436,6 +946,12 @@ a {
 		padding-top: 20px;
 	}
 
+	.tab-nav {
+		flex-direction: column;
+		gap: 12px;
+		align-items: flex-start;
+	}
+
 	.field-grid {
 		grid-template-columns: 1fr;
 	}
@@ -443,5 +959,32 @@ a {
 	.section-heading {
 		flex-direction: column;
 		align-items: start;
+	}
+
+	.activity-item {
+		grid-template-columns: 1fr;
+	}
+
+	.activity-time-col {
+		padding-top: 0;
+	}
+
+	.day-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
+	}
+
+	.pipeline-tracker {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.pipeline-stage {
+		justify-content: flex-start;
+	}
+
+	.intent-grid {
+		grid-template-columns: 1fr 1fr;
 	}
 }

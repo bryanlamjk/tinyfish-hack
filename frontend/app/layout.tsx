@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
 	title: "TravellingFish",
 	description:
-		"Concurrent TinyFish search dashboard with live agent streams.",
+		"AI itinerary planner and concurrent TinyFish search dashboard.",
 };
 
 export default function RootLayout({
