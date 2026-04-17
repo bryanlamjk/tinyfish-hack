@@ -24,3 +24,5 @@ results/
 node_modules/
 frontend/node_modules/
 frontend/.next/
+
+BACKEND_SPEC.md
