@@ -8,6 +8,8 @@ dependencies = [
   "fastapi",
   "google-genai",
   "langgraph",
+  "langsmith",
+  "python-dotenv",
   "tinyfish>=0.2.4",
   "uvicorn",
 ]
