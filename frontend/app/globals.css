@@ -694,6 +694,109 @@ a {
 	text-align: center;
 }
 
+/* ─── Narrative Report ───────────────────────────────────────────── */
+
+.narrative-report {
+	padding: 28px 32px;
+	margin-bottom: 24px;
+	border-radius: 22px;
+	background: linear-gradient(
+		180deg,
+		rgba(255, 250, 243, 0.9) 0%,
+		rgba(244, 239, 229, 0.7) 100%
+	);
+	border: 1px solid var(--line);
+	position: relative;
+	overflow: hidden;
+}
+
+.narrative-report::before {
+	content: "";
+	position: absolute;
+	top: -40px;
+	right: -40px;
+	width: 160px;
+	height: 160px;
+	border-radius: 999px;
+	background: rgba(201, 91, 43, 0.08);
+	pointer-events: none;
+}
+
+.narrative-eyebrow {
+	margin: 0 0 14px;
+	text-transform: uppercase;
+	letter-spacing: 0.2em;
+	font-size: 0.72rem;
+	font-weight: 700;
+	color: var(--accent-dark);
+	font-family: Arial, Helvetica, sans-serif;
+	position: relative;
+}
+
+.narrative-heading {
+	font-family: Georgia, "Times New Roman", serif;
+	color: var(--ink);
+	line-height: 1.25;
+	position: relative;
+}
+
+.narrative-heading-1 {
+	margin: 20px 0 14px;
+	font-size: 1.8rem;
+}
+
+.narrative-heading-2 {
+	margin: 24px 0 10px;
+	font-size: 1.3rem;
+	color: var(--accent-dark);
+	padding-bottom: 6px;
+	border-bottom: 1px solid rgba(201, 91, 43, 0.2);
+}
+
+.narrative-heading-3 {
+	margin: 16px 0 8px;
+	font-size: 1.05rem;
+	color: var(--mint);
+}
+
+.narrative-paragraph {
+	margin: 0 0 14px;
+	color: var(--ink);
+	font-size: 1.02rem;
+	line-height: 1.75;
+	position: relative;
+}
+
+.narrative-paragraph:first-of-type {
+	font-size: 1.1rem;
+	color: var(--ink);
+}
+
+.narrative-paragraph:first-of-type::first-letter {
+	font-size: 2.4rem;
+	float: left;
+	line-height: 1;
+	padding: 4px 8px 0 0;
+	color: var(--accent);
+	font-weight: 700;
+}
+
+.narrative-list {
+	margin: 0 0 16px;
+	padding-left: 22px;
+	color: var(--ink);
+	font-size: 0.98rem;
+	line-height: 1.7;
+}
+
+.narrative-list li {
+	margin-bottom: 6px;
+}
+
+.narrative-list li::marker {
+	color: var(--accent);
+}
+
 /* ─── Itinerary Result ───────────────────────────────────────────── */
 
 .itinerary-summary-card {
@@ -986,5 +1089,9 @@ a {
 
 	.intent-grid {
 		grid-template-columns: 1fr 1fr;
+	}
+
+	.narrative-report {
+		padding: 20px;
 	}
 }

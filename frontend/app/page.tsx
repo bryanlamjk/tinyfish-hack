@@ -97,6 +97,7 @@ type ItineraryResult = {
 	days: ItineraryDay[];
 	total_estimated_cost: string;
 	summary: string;
+	narrative_report: string | null;
 };
 
 type PipelineStage =
@@ -208,6 +209,125 @@ function compareByTimeOfDay(
 	const orderA = TIME_OF_DAY_ORDER[a.time_of_day.toLowerCase()] ?? 3;
 	const orderB = TIME_OF_DAY_ORDER[b.time_of_day.toLowerCase()] ?? 3;
 	return orderA - orderB;
+}
+
+/**
+ * Render a subset of markdown used by the itinerary narrative report.
+ *
+ * The backend emits a tightly bounded format: an opening paragraph, then
+ * repeated "## Day N" sections that contain bullets ("- ...") and/or short
+ * paragraphs. Inline formatting is limited to **bold** and *italic*. A full
+ * markdown library would be over-engineering for this narrow surface area.
+ *
+ * Input: markdown -- the raw markdown string from result.narrative_report.
+ * Output: A React fragment with headings, paragraphs, and unordered lists.
+ */
+function NarrativeMarkdown({ markdown }: { markdown: string }) {
+	const lines = markdown.split(/\r?\n/);
+	const blocks: React.ReactNode[] = [];
+
+	let paragraphBuffer: string[] = [];
+	let listBuffer: string[] = [];
+
+	function flushParagraph(): void {
+		if (paragraphBuffer.length === 0) return;
+		const text = paragraphBuffer.join(" ");
+		blocks.push(
+			<p key={`p-${blocks.length}`} className="narrative-paragraph">
+				{renderInline(text)}
+			</p>,
+		);
+		paragraphBuffer = [];
+	}
+
+	function flushList(): void {
+		if (listBuffer.length === 0) return;
+		blocks.push(
+			<ul key={`ul-${blocks.length}`} className="narrative-list">
+				{listBuffer.map((item, index) => (
+					<li key={`li-${blocks.length}-${index}`}>
+						{renderInline(item)}
+					</li>
+				))}
+			</ul>,
+		);
+		listBuffer = [];
+	}
+
+	for (const rawLine of lines) {
+		const line = rawLine.trimEnd();
+
+		if (line.trim() === "") {
+			flushParagraph();
+			flushList();
+			continue;
+		}
+
+		const headingMatch = /^(#{1,3})\s+(.*)$/.exec(line);
+		if (headingMatch) {
+			flushParagraph();
+			flushList();
+			const level = headingMatch[1].length;
+			const content = headingMatch[2];
+			const className = `narrative-heading narrative-heading-${level}`;
+			const key = `h-${blocks.length}`;
+			if (level === 1) {
+				blocks.push(
+					<h3 key={key} className={className}>
+						{renderInline(content)}
+					</h3>,
+				);
+			} else if (level === 2) {
+				blocks.push(
+					<h4 key={key} className={className}>
+						{renderInline(content)}
+					</h4>,
+				);
+			} else {
+				blocks.push(
+					<h5 key={key} className={className}>
+						{renderInline(content)}
+					</h5>,
+				);
+			}
+			continue;
+		}
+
+		const bulletMatch = /^\s*[-*]\s+(.*)$/.exec(line);
+		if (bulletMatch) {
+			flushParagraph();
+			listBuffer.push(bulletMatch[1]);
+			continue;
+		}
+
+		flushList();
+		paragraphBuffer.push(line.trim());
+	}
+
+	flushParagraph();
+	flushList();
+
+	return <>{blocks}</>;
+}
+
+/**
+ * Render inline markdown formatting (bold and italic) within a text run.
+ *
+ * Input: text -- a single line of markdown-flavored text.
+ * Output: An array of React nodes with <strong>/<em> wrappers applied.
+ */
+function renderInline(text: string): React.ReactNode[] {
+	const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
+	const parts = text.split(pattern);
+	return parts.map((part, index) => {
+		if (part.startsWith("**") && part.endsWith("**")) {
+			return <strong key={index}>{part.slice(2, -2)}</strong>;
+		}
+		if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+			return <em key={index}>{part.slice(1, -1)}</em>;
+		}
+		return <span key={index}>{part}</span>;
+	});
 }
 
 // ─── Main Component ───────────────────────────────────────────────────
@@ -1143,6 +1263,19 @@ export default function HomePage() {
 							<div className="section-heading">
 								<h2>Your Itinerary</h2>
 							</div>
+
+							{itineraryResult.narrative_report && (
+								<div className="narrative-report">
+									<p className="narrative-eyebrow">
+										Travel Narrative
+									</p>
+									<NarrativeMarkdown
+										markdown={
+											itineraryResult.narrative_report
+										}
+									/>
+								</div>
+							)}
 
 							<div className="itinerary-summary-card">
 								<p className="itinerary-summary-text">
